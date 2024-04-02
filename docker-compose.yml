@@ -1,0 +1,8 @@
+version: '3'
+services:
+  microservicio_db:
+    build: ./Database
+    ports:
+      - "5000:5000"
+    environment:
+      - MONGO_URI=mongodb+srv://admin:Hola33..@securehrizon.xfycitu.mongodb.net/?retryWrites=true&w=majority&appName=SecureHrizon
