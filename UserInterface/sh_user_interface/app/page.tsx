@@ -16,7 +16,7 @@ export default function Home() {
             target="_blank"
             rel="noopener noreferrer"
           >
-            Bsaday{" "}
+            Vamos a ver sisierto{" "}
           </a>
         </div>
       </div>
