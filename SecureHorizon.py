@@ -47,9 +47,9 @@ def captureTraffic(ipregistered,network: str="Ethernet") -> None:
                         ipregistered[currlayer.src]=1
                 except:
                     pass
-        total+=1
-        if total==1000:
-            break
+        #total+=1
+        #if total==1000:
+        #    break
 def secureHorizon() -> None:
     import multiprocessing as mp
     ipregistered=mp.Manager().dict()
