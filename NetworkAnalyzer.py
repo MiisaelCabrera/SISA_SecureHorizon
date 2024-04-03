@@ -1,3 +1,4 @@
+import numpy
 from collections import defaultdict
 import pandas as pd
 from scapy.all import *
@@ -16,6 +17,11 @@ def hasIPLayer(packet: Packet):
         return packet.getlayer("IPv6").fields
     else:
         return None
+
+def hasEthernetLayer(packet: Packet):
+    if packet.haslayer("Ether"):
+        return packet.getlayer("Ether").fields
+    else:
         return None
 def hasUDPLayer(packet: Packet):
     if packet.haslayer("UDP"):
@@ -29,12 +35,43 @@ def getProtocolNameWithNumberOfProtocol(protocol: int):
 def getFlagsInTCP(flagsTCP:str):
     return ",".join(flagsTCP)
 
+def getTimeFormatwithoutladdingzeros():
+    datestart =datetime.now().strftime("%m/%d/%Y %H:%M").lstrip("0")
+    spliteddate=datestart.split("/")
+    if spliteddate[1][0]=="0":
+        spliteddate[1]=spliteddate[1][1]
+    datestart="/".join(spliteddate)
+    spliteddate=datestart.split(" ")
+    if spliteddate[1][0]=="0":
+        spliteddate[1]=spliteddate[1][1:]
+    datestart=" ".join(spliteddate)
+    return datestart
+
+def metadataSortedFormat(metadataNotSortedForModel: dict):
+    metadataSorted={}
+    metadataSorted["appName"] = metadataNotSortedForModel["appName"]
+    metadataSorted["totalSourceBytes"] = metadataNotSortedForModel["totalSourceBytes"]
+    metadataSorted["totalDestinationBytes"] = metadataNotSortedForModel["totalDestinationBytes"]
+    metadataSorted["totalDestinationPackets"] = metadataNotSortedForModel["totalDestinationPackets"]
+    metadataSorted["totalSourcePackets"] = metadataNotSortedForModel["totalSourcePackets"]
+    metadataSorted["direction"] = metadataNotSortedForModel["direction"]
+    metadataSorted["sourceTCPFlagsDescription"] = metadataNotSortedForModel["sourceTCPFlagsDescription"]
+    metadataSorted["destinationTCPFlagsDescription"] = metadataNotSortedForModel["destinationTCPFlagsDescription"]
+    metadataSorted["source"]=metadataNotSortedForModel["source"]
+    metadataSorted["protocolName"]=metadataNotSortedForModel["protocolName"]
+    metadataSorted["sourcePort"] = metadataNotSortedForModel["sourcePort"]
+    metadataSorted["destination"] = metadataNotSortedForModel["destination"]
+    metadataSorted["destinationPort"] = metadataNotSortedForModel["destinationPort"]
+    metadataSorted["startDateTime"] = metadataNotSortedForModel["startDateTime"]
+    metadataSorted["stopDateTime"] = metadataNotSortedForModel["stopDateTime"]
+    return metadataSorted
 def packet_callback(packet):
     metadatainpacketfordictionarie={}
-    #print(packet.fields)
+    EtherLayer =hasEthernetLayer(packet)
     IPLayer=hasIPLayer(packet)
     #print(packet.layers)
     #print(len(packet.layers()))
+
     if IPLayer:
         metadatainpacketfordictionarie["source"]=IPLayer["src"]
         metadatainpacketfordictionarie["destination"]=IPLayer["dst"]
@@ -45,7 +82,7 @@ def packet_callback(packet):
             try:
                 metadatainpacketfordictionarie["protocolName"]=getProtocolNameWithNumberOfProtocol(IPLayer["nh"])
             except:
-                print(1/0)
+                metadatainpacketfordictionarie["protocolName"]=0
                 
     else:
         metadatainpacketfordictionarie["source"]=0
@@ -55,10 +92,13 @@ def packet_callback(packet):
     if TCPLayer:
         metadatainpacketfordictionarie["sourcePort"]=TCPLayer["sport"]
         metadatainpacketfordictionarie["destinationPort"]=TCPLayer["dport"]
-        #print(getFlagsInTCP(TCPLayer["flags"]))
+        metadatainpacketfordictionarie["sourceTCPFlagsDescription"]=getFlagsInTCP(TCPLayer["flags"]) # Fake
+        metadatainpacketfordictionarie["destinationTCPFlagsDescription"]="F,P,A" # Fake
     else:
+        metadatainpacketfordictionarie["sourceTCPFlagsDescription"]="N/A"
+        metadatainpacketfordictionarie["destinationTCPFlagsDescription"]="N/A"
         metadatainpacketfordictionarie["sourcePort"]=0
-        metadatainpacketfordictionarie["destinationPort"]=0
+        metadatainpacketfordictionarie["destinationPort"]=0 
     UDPLayer= hasUDPLayer(packet)
     if UDPLayer:
         metadatainpacketfordictionarie["sourcePort"]=UDPLayer["sport"]
@@ -66,9 +106,26 @@ def packet_callback(packet):
     else:
         metadatainpacketfordictionarie["sourcePort"]=0
         metadatainpacketfordictionarie["destinationPort"]=0
-    metadatainpacketfordictionarie["startDateTime"] = datetime.now().strftime("%m/%d/%Y %H:%M")
-    metadatainpacketfordictionarie["stopDateTime"] = datetime.now().strftime("%m/%d/%Y %H:%M")
-    print(metadatainpacketfordictionarie)
+    metadatainpacketfordictionarie["totalDestinationBytes"]=len(packet)
+    last=packet.getlayer(packet.layers()[-1])
+    lastlayer=packet.getlayer(packet.layers()[-1]).fields
+    if "load" in lastlayer:
+        metadatainpacketfordictionarie["totalSourceBytes"]=len(lastlayer["load"])
+    else:
+        metadatainpacketfordictionarie["totalSourceBytes"]=0
+    metadatainpacketfordictionarie["startDateTime"] = getTimeFormatwithoutladdingzeros()
+    metadatainpacketfordictionarie["stopDateTime"] = getTimeFormatwithoutladdingzeros()
+    #print(len(packet))
+    #print(f"src: {metadatainpacketfordictionarie['totalSourceBytes']} dst:{metadatainpacketfordictionarie['totalDestinationBytes']}")
+    direction=["L2R","L2L"]
+    metadatainpacketfordictionarie["appName"]="DNS" # Fake
+    metadatainpacketfordictionarie["direction"]=direction[numpy.random.randint(low=0,high=2)] # Fake
+    metadatainpacketfordictionarie["totalSourcePackets"]=numpy.random.randint(low=0,high=70) # Fake
+    metadatainpacketfordictionarie["totalDestinationPackets"]=numpy.random.randint(low=metadatainpacketfordictionarie["totalSourcePackets"],high=metadatainpacketfordictionarie["totalSourcePackets"]+70) # Fake
+    
+    metadata=pd.DataFrame(metadataSortedFormat(metadatainpacketfordictionarie),index=[0])
+    print(metadata)
 show_interfaces()
 
-sniff( prn=packet_callback,count=150)
+
+sniff( prn=packet_callback,iface="Realtek PCIe FE Family Controller")
