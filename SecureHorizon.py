@@ -34,10 +34,10 @@ def captureTraffic(ipregistered,network: str="Ethernet") -> None:
     for packet in capture.sniff_continuously(): 
         ip_detected=False
         for layer in packet.layers: 
-            print("\n\n\n\n\n\n" + "current layer: " + layer.layer_name )
+            #print("\n\n\n\n\n\n" + "current layer: " + layer.layer_name )
             currlayer=getattr(packet,layer.layer_name)
             for field in currlayer.field_names:
-                print(f"{field} : {getattr(currlayer,field)}")
+                #print(f"{field} : {getattr(currlayer,field)}")
                 try:
                     if currlayer.src in ipregistered and not ip_detected:
                         ipregistered[currlayer.src]+=1
