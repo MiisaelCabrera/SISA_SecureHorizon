@@ -1,0 +1,19 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: secure-horizon-ui
+spec:
+  replicas: 1 # Ajustado a dos réplicas para mayor disponibilidad
+  selector:
+    matchLabels:
+      app: SHUI
+  template:
+    metadata:
+      labels:
+        app: SHUI
+    spec:
+      containers:
+        - name: nombre-del-contenedor
+          image: gcr.io/securehorizon-419122/user-interface:UII
+          ports:
+            - containerPort: 3000 # Puerto en el que escucha tu aplicación

@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: secure-horizon-ui-deployment
+spec:
+  replicas: 1 # Ajustado a dos réplicas para mayor disponibilidad
+  selector:
+    matchLabels:
+      app: secure-horizon-ui
+  template:
+    metadata:
+      labels:
+        app: secure-horizon-ui
+    spec:
+      containers:
+        - name: secure-horizon-ui-container
+          image: gcr.io/securehorizon-419122/user-interface:UII
+          ports:
+            - containerPort: 3000 # Puerto en el que escucha tu aplicación
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: secure-horizon-ui-service
+spec:
+  selector:
+    app: secure-horizon-ui
+  ports:
+    - protocol: TCP
+      port: 3000
+      targetPort: 3000
+  type: LoadBalancer
