@@ -259,7 +259,7 @@ def captureTrafficScapy(ipregistered,model):
         metadata=pd.DataFrame(metadataSortedFormat(metadatainpacketfordictionarie),index=[0])
         
         print(metadata)
-        #model.predict(decodeDataInInt(metadata))
+        model.predict(decodeDataInInt(metadata))
     show_interfaces()
 
 
@@ -318,7 +318,7 @@ def secureHorizon() -> None:
     ipregistered=mp.Manager().dict()
     #mp.Process(target=captureTraffic,args=[]).start()
     #mp.Process(target=timeToSendFrequentsIPtoDatabase,args=[]).start()
-    with open('dtree_best_model.pkl', 'rb') as f:
+    with open('dtree_best_model (1).pkl', 'rb') as f:
         clf2 = pickle.load(f)
     pool = mp.Pool(mp.cpu_count())
     process1=pool.apply_async(timeToSendFrequentsIPtoDatabase,args=[ipregistered])
