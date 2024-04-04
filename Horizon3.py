@@ -4,6 +4,7 @@ from scapy import *
 import pyshark
 import time
 import math
+import pickle
 import numpy
 from collections import defaultdict
 import pandas as pd
@@ -36,6 +37,7 @@ def activeTrigger(asunto="¡Anomalía detectada en el tráfico de red!",mensaje=
     msg['From'] = usuario
     msg['To'] = destinatario
     msg['Subject'] = asunto
+
     # Agrega el cuerpo del mensaje
     msg.attach(MIMEText(mensaje, 'plain'))
 
@@ -92,7 +94,45 @@ def createJson(dictionarie: dict,outputfile: str="data.json") -> None:
         with open(outputfile, "w") as archivo:
             json.dump({row[0]:row[1]}, archivo)
         dosfilter({row[0]:row[1]})
-def captureTrafficScapy(ipregistered):
+def process_time(time):
+    time = time.split(" ")[-1]
+    h, m = time.split(":")
+    return 3600*int(h)+60*int(m)
+
+def decodeDataInInt(dataframe: pd.DataFrame):
+    try:
+        dataframe["source"] = dataframe["source"].apply(
+        lambda ip: struct.unpack("!I", socket.inet_aton(ip))[0])
+    except:
+        dataframe["destination"] = 3640016945
+    try:
+        dataframe["destination"] = dataframe["destination"].apply(lambda ip: struct.unpack("!I", socket.inet_aton(ip))[0])
+    except:
+        dataframe["destination"] = 3640016945
+    dataframe["startDateTime"] = dataframe["startDateTime"].apply(lambda time: process_time(time))
+    dataframe["stopDateTime"] = dataframe["stopDateTime"].apply(lambda time: process_time(time))
+    dataframe["sourceTCPFlagsDescription"] = dataframe["sourceTCPFlagsDescription"].apply(lambda flags: flags_transform(flags))
+    dataframe["destinationTCPFlagsDescription"] = dataframe["destinationTCPFlagsDescription"].apply(lambda flags: flags_transform(flags))
+    dataframe["protocolName"] = dataframe["protocolName"].astype("category")
+    dataframe["protocolName"] = dataframe["protocolName"].cat.codes
+    dataframe["appName"] = dataframe["appName"].astype("category")
+    dataframe["appName"] = dataframe["appName"].cat.codes
+    dataframe["direction"] = dataframe["direction"].astype("category")
+    dataframe["direction"] = dataframe["direction"].cat.codes
+    return dataframe
+def flags_transform(flags):
+    value = 0
+    if type(flags) is str:
+        flags = flags.replace(" ", "")
+        for c in flags:
+            if c != ',':
+                value += ord(c)
+
+    return value
+
+
+
+def captureTrafficScapy(ipregistered,model):
     def hasTCP(packet: Packet):
         if packet.haslayer("TCP"):
             return packet.getlayer("TCP").fields
@@ -218,6 +258,8 @@ def captureTrafficScapy(ipregistered):
         
         metadata=pd.DataFrame(metadataSortedFormat(metadatainpacketfordictionarie),index=[0])
         
+        print(metadata)
+        #model.predict(decodeDataInInt(metadata))
     show_interfaces()
 
 
@@ -276,11 +318,12 @@ def secureHorizon() -> None:
     ipregistered=mp.Manager().dict()
     #mp.Process(target=captureTraffic,args=[]).start()
     #mp.Process(target=timeToSendFrequentsIPtoDatabase,args=[]).start()
-
+    with open('dtree_best_model.pkl', 'rb') as f:
+        clf2 = pickle.load(f)
     pool = mp.Pool(mp.cpu_count())
     process1=pool.apply_async(timeToSendFrequentsIPtoDatabase,args=[ipregistered])
-    process2=pool.apply_async(captureTrafficScapy,args=[ipregistered])
-    
+    process2=pool.apply_async(captureTrafficScapy,args=[ipregistered,clf2])
+
     process2.get()
     process1.get()
     pool.close()
