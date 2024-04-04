@@ -9,6 +9,73 @@ from collections import defaultdict
 import pandas as pd
 import heapq
 from scapy.all import *
+import json
+import smtplib
+import os
+from email.mime.multipart import MIMEMultipart
+import email.mime.base
+from email.mime.text import MIMEText
+
+"""
+    Escaneo de puertos 
+    ataque DD2
+    prueba de inyeccion SQL
+    Prueba de archivo malicioso
+"""
+def activeTrigger(asunto="¡Anomalía detectada en el tráfico de red!",mensaje="Se ha detectado una anomalía en el tráfico de red. Por favor, revisa el servidor.",destinatario="angeldaniels365@gmail.com"):
+    # Llama a esta función cuando detectes una anomalía y no haya usuarios activos en la página web
+    usuario = 'securehorizon45@gmail.com'
+    contra = 'tpadyfuneksadfiw'
+    # Conecta al servidor SMTP
+    server = smtplib.SMTP('smtp.gmail.com', 587)
+    server.starttls()  # Habilita el cifrado TLS
+    server.login(usuario, contra)
+
+    # Crea un objeto de mensaje
+    msg = MIMEMultipart()
+    msg['From'] = usuario
+    msg['To'] = destinatario
+    msg['Subject'] = asunto
+
+    # Agrega el cuerpo del mensaje
+    msg.attach(MIMEText(mensaje, 'plain'))
+
+    # Envía el correo electrónico
+    texto_correo = msg.as_string()
+    server.sendmail(usuario, destinatario, texto_correo)
+
+    # Cierra la conexión
+    server.quit()
+
+def dosfilter(diction: dict,maxRequestsPerMinute=3500):
+    lastrow = diction.items()[-1]
+    latest=0
+    comparison=None
+    print(lastrow)
+    if lastrow[0]-60 in diction:
+        comparison=diction[lastrow[0]-60]
+    if not comparison:
+        for i in lastrow[1].values():
+            if i>maxRequestsPerMinute:
+                activeTrigger()
+            print(i)
+
+def createJson(dictionarie: dict,outputfile: str="data.json") -> None:
+    #print(dictionarie)
+    try:
+        with open(outputfile, "r") as archivo:
+            data = json.load(archivo)
+        row=dictionarie["1"]
+        data[row[0]]=row[1]
+        with open(outputfile, "w") as archivo:
+            json.dump(data, archivo)
+        dosfilter(data)
+    except:
+        row=dictionarie["1"]
+
+        with open(outputfile, "w") as archivo:
+            json.dump({row[0]:row[1]}, archivo)
+        dosfilter({row[0]:row[1]})
 def captureTrafficScapy(ipregistered):
     def hasTCP(packet: Packet):
         if packet.haslayer("TCP"):
@@ -101,11 +168,11 @@ def captureTrafficScapy(ipregistered):
         if TCPLayer:
             metadatainpacketfordictionarie["sourcePort"]=TCPLayer["sport"]
             metadatainpacketfordictionarie["destinationPort"]=TCPLayer["dport"]
-            metadatainpacketfordictionarie["sourceTCPFlagsDescription"]=getFlagsInTCP(TCPLayer["flags"]) # Fake
-            metadatainpacketfordictionarie["destinationTCPFlagsDescription"]="F,P,A" # Fake
+            metadatainpacketfordictionarie["sourceTCPFlagsDescription"]=getFlagsInTCP(TCPLayer["flags"]) 
+            metadatainpacketfordictionarie["destinationTCPFlagsDescription"]=0
         else:
-            metadatainpacketfordictionarie["sourceTCPFlagsDescription"]="N/A"
-            metadatainpacketfordictionarie["destinationTCPFlagsDescription"]="N/A"
+            metadatainpacketfordictionarie["sourceTCPFlagsDescription"]=0
+            metadatainpacketfordictionarie["destinationTCPFlagsDescription"]=0
             metadatainpacketfordictionarie["sourcePort"]=0
             metadatainpacketfordictionarie["destinationPort"]=0 
         UDPLayer= hasUDPLayer(packet)
@@ -119,6 +186,7 @@ def captureTrafficScapy(ipregistered):
         last=packet.getlayer(packet.layers()[-1])
         lastlayer=packet.getlayer(packet.layers()[-1]).fields
         if "load" in lastlayer:
+            #print(lastlayer)
             metadatainpacketfordictionarie["totalSourceBytes"]=len(lastlayer["load"])
         else:
             metadatainpacketfordictionarie["totalSourceBytes"]=0
@@ -127,7 +195,7 @@ def captureTrafficScapy(ipregistered):
         #print(len(packet))
         #print(f"src: {metadatainpacketfordictionarie['totalSourceBytes']} dst:{metadatainpacketfordictionarie['totalDestinationBytes']}")
         direction=["L2R","L2L"]
-        metadatainpacketfordictionarie["appName"]="DNS" # Fake
+        metadatainpacketfordictionarie["appName"]=0
         metadatainpacketfordictionarie["direction"]=direction[numpy.random.randint(low=0,high=2)] # Fake
         metadatainpacketfordictionarie["totalSourcePackets"]=numpy.random.randint(low=0,high=70) # Fake
         metadatainpacketfordictionarie["totalDestinationPackets"]=numpy.random.randint(low=metadatainpacketfordictionarie["totalSourcePackets"],high=metadatainpacketfordictionarie["totalSourcePackets"]+70) # Fake
@@ -142,23 +210,28 @@ def captureTrafficScapy(ipregistered):
 def sortdnumericditionaryinalist(defaultdictionarie: defaultdict):
     mostfrequentips=[]
     for i in defaultdictionarie.items():
-        if len(mostfrequentips)>=10:
-            heapq.heappop(mostfrequentips)
-        heapq.heappush(mostfrequentips,[-i[1],i[0]])
-    mostfrequentipsarray=[]
-    while len(mostfrequentips)>0:
-        ip=heapq.heappop(mostfrequentips)
-        #print(mostfrequentips)
-        mostfrequentipsarray.append([ip[1],-ip[0]])
-    return mostfrequentipsarray
+        mostfrequentips.append([i[0],i[1]])
+    mostfrequentips.sort(key=lambda x:x[1],reverse=True)
+    if len(mostfrequentips)<=10:
+        dictio={}
+        for i in mostfrequentips:
+            dictio[i[0]]=i[1]
+        return dictio
+    else:
+        dictio={}
+        for i in mostfrequentips[0:10]:
+            dictio[i[0]]=i[1]
+        return dictio    
 def timeToSendFrequentsIPtoDatabase(ipregistered,secondstosend: int=60):
     print("send started")
     current_time=0
+    
     while True:
         if math.floor(time.time())%secondstosend==0 and math.floor(time.time())!=math.floor(current_time):
             currentdatetime=datetime.fromtimestamp(int(time.time()))
             currenttimestamp=int(time.time())
-            print(f"{currentdatetime} {math.floor(current_time)} {sortdnumericditionaryinalist(ipregistered)}")
+            createJson({"1":[math.floor(current_time),sortdnumericditionaryinalist(ipregistered)]})
+            #print(f"{currentdatetime} {math.floor(current_time)} {sortdnumericditionaryinalist(ipregistered)}")
             current_time=time.time()
             time.sleep(1)
 
