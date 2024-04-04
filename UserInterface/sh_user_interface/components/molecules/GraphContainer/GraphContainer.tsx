@@ -10,16 +10,18 @@ const GraphContainer: FunctionComponent<GraphContainerProps> = ({
   className,
 }) => {
   const [maxValue, setMaxValue] = useState(0);
+  console.log(trafficData)
 
   useEffect(() => {
-    const sourceBytesArray = trafficData.map((item) => item.totalSourceBytes);
+    if(trafficData){
+    const sourceBytesArray = trafficData && trafficData.map((item) => item.quantity);
 
     setMaxValue(
       sourceBytesArray.reduce(
         (max, currentValue) => Math.max(max, currentValue),
         0
       )
-    );
+    );}
   }, [trafficData]);
 
   return (
@@ -27,8 +29,8 @@ const GraphContainer: FunctionComponent<GraphContainerProps> = ({
       <div className="flex flex-col p-2">
         {trafficData &&
           trafficData.map((data, index) => (
-            <div className="flex my-4 h-8" key={index + data.startDateTime}>
-              {data.source}
+            <div className="flex my-4 h-8" key={index + data.ip}>
+              {data.ip}
             </div>
           ))}
       </div>
@@ -36,8 +38,8 @@ const GraphContainer: FunctionComponent<GraphContainerProps> = ({
         {trafficData &&
           trafficData.map((data, index) => (
             <Graph
-              quantity={data.totalSourceBytes}
-              key={index + data.startDateTime}
+              quantity={data.quantity}
+              key={index + data.ip}
               max={maxValue}
             />
           ))}

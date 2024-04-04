@@ -7,35 +7,14 @@ import ToggleButton from "@/components/atoms/ToggleButton/ToggleButton";
 import TableContainer from "@/components/molecules/TableContainer/TableContainer";
 
 interface TrafficData {
-  generated: Date;
-  appName: string;
-  totalSourceBytes: number;
-  totalDestinationBytes: number;
-  totalDestinationPackets: number;
-  totalSourcePackets: number;
-  sourcePayloadAsBase64: string;
-  sourcePayloadAsUTF: string;
-  destinationPayloadAsBase64: string;
-  destinationPayloadAsUTF: string;
-  sourceTCPFlagsDescription: string;
-  destinationTCPFlagsDescription: string;
-  source: string;
-  protocolName: string;
-  sourcePort: number;
-  destination: string;
-  destinationPort: number;
-  startDateTime: string;
-  stopDateTime: string;
-  Label: string;
+  
+  ip:string;
+  quantity:number;
 }
 
 const HEADERS = [
-  { head: "Source", id: "source" },
-  { head: "Protocol", id: "protocolName" },
-  { head: "Application Name", id: "appName" },
-  { head: "Packets sent", id: "totalDestinationPackets" },
-  { head: "Packets received", id: "totalSourcePackets" },
-  { head: "Destination", id: "destination" },
+  { head: "Source", id: "ip" },
+  { head: "Packets sent", id: "quantity" },
 ];
 
 const BUTTON_ICONS = {
@@ -45,14 +24,15 @@ const BUTTON_ICONS = {
 
 const DataContainer: FunctionComponent = () => {
   const [trafficData, setTrafficData] = useState([] as TrafficData[]);
-  const [interval, setInterval] = useState(60000); // 1 minute [ms]
+  const [interval, setInterval] = useState(1000); // 1 minute [ms]
   const [isGraphView, setIsGraphView] = useState(true);
 
   const fetchData = async () => {
     try {
-      const response = await fetch("/csvjson.json"); // Ruta relativa al archivo JSON
+      const response = await fetch("/datos.json"); // Ruta relativa al archivo JSON
       const data = await response.json();
-      setTrafficData(data.data);
+      console.log(data);
+      setTrafficData(data);
     } catch (error) {
       console.error("Error fetching data:", error);
     }
@@ -95,6 +75,8 @@ const DataContainer: FunctionComponent = () => {
           className="w-32  h-12 px-2 bg-black outline-none my-auto border rounded-lg  mx-2"
           defaultValue={interval.toString()}
         >
+          <option value="1000">1 Seconds</option>
+          <option value="5000">5 Seconds</option>
           <option value="30000">30 Seconds</option>
           <option value="60000">1 Minute</option>
           <option value="3600000">1 Hour</option>

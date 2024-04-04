@@ -28,7 +28,7 @@ const TableContainer: FunctionComponent<TableContainerProps> = ({
         </tr>
       </thead>
       <tbody className="flex w-full mt-4 flex-col">
-        {trafficData.map((data, index) => (
+        {trafficData && trafficData.map((data, index) => (
           <tr key={index} className="flex w-full ">
             {headers.map((header, index) => (
               <td className="w-1/6 my-2 text-center" key={index}>

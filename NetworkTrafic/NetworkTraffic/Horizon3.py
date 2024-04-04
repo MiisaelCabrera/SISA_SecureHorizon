@@ -3,6 +3,7 @@ from collections import defaultdict
 from scapy import *
 import time
 import math
+import pickle
 import numpy
 from collections import defaultdict
 import pandas as pd
@@ -22,7 +23,7 @@ from email.mime.text import MIMEText
     prueba de inyeccion SQL
     Prueba de archivo malicioso
 """
-def activeTrigger(asunto="¡Anomalía detectada en el tráfico de red!",mensaje="Se ha detectado una anomalía en el tráfico de red. Por favor, revisa el servidor.",destinatario="angeldaniels365@gmail.com"):
+def activeTrigger(asunto="¡Anomalía detectada en el tráfico de red!",mensaje="Se ha detectado una anomalía en el tráfico de red. Por favor, revisa el servidor.",destinatario="alanaxelcastroresendiz@gmail.com"):
     # Llama a esta función cuando detectes una anomalía y no haya usuarios activos en la página web
     usuario = 'securehorizon45@gmail.com'
     contra = 'tpadyfuneksadfiw'
@@ -47,21 +48,38 @@ def activeTrigger(asunto="¡Anomalía detectada en el tráfico de red!",mensaje=
     # Cierra la conexión
     server.quit()
 
-def dosfilter(diction: dict,maxRequestsPerMinute=3500):
-    lastrow = diction.items()[-1]
+def requestmadeatminuteforIP(minute,data,IP):
+    if minute in data:
+        IPsMinute=data[minute]
+        print(IPsMinute)
+        if IP in IPsMinute:
+            return IPsMinute[IP]
+        else:
+            return 0
+            
+    else:
+        return 0
+
+def dosfilter(diction: dict,previous=None,maxRequestsPerMinute=900):
+    lastrow = diction.items()
+    
     latest=0
     comparison=None
-    print(lastrow)
-    if lastrow[0]-60 in diction:
-        comparison=diction[lastrow[0]-60]
-    if not comparison:
-        for i in lastrow[1].values():
-            if i>maxRequestsPerMinute:
-                activeTrigger()
-            print(i)
+    if previous:
+        #print(lastrow)
+        for i in lastrow:
+            minute=i[0]-60
+            for val in i[1].items():
+                if val[1]-requestmadeatminuteforIP(minute,previous,val[0])>maxRequestsPerMinute:
+                    activeTrigger()      
+    else:
+        for i in lastrow:
+            for val in i[1].values():
+                if val>maxRequestsPerMinute:
+                    activeTrigger()
+        
 
 def createJson(dictionarie: dict,outputfile: str="data.json") -> None:
-    #print(dictionarie)
     try:
         with open(outputfile, "r") as archivo:
             data = json.load(archivo)
@@ -69,14 +87,52 @@ def createJson(dictionarie: dict,outputfile: str="data.json") -> None:
         data[row[0]]=row[1]
         with open(outputfile, "w") as archivo:
             json.dump(data, archivo)
-        #dosfilter(data)
+        dosfilter(diction={row[0]:row[1]},previous=data)
     except:
         row=dictionarie["1"]
 
         with open(outputfile, "w") as archivo:
             json.dump({row[0]:row[1]}, archivo)
-        #dosfilter({row[0]:row[1]})
-def captureTrafficScapy(ipregistered):
+        dosfilter({row[0]:row[1]})
+def process_time(time):
+    time = time.split(" ")[-1]
+    h, m = time.split(":")
+    return 3600*int(h)+60*int(m)
+
+def decodeDataInInt(dataframe: pd.DataFrame):
+    try:
+        dataframe["source"] = dataframe["source"].apply(
+        lambda ip: struct.unpack("!I", socket.inet_aton(ip))[0])
+    except:
+        dataframe["destination"] = 3640016945
+    try:
+        dataframe["destination"] = dataframe["destination"].apply(lambda ip: struct.unpack("!I", socket.inet_aton(ip))[0])
+    except:
+        dataframe["destination"] = 3640016945
+    dataframe["startDateTime"] = dataframe["startDateTime"].apply(lambda time: process_time(time))
+    dataframe["stopDateTime"] = dataframe["stopDateTime"].apply(lambda time: process_time(time))
+    dataframe["sourceTCPFlagsDescription"] = dataframe["sourceTCPFlagsDescription"].apply(lambda flags: flags_transform(flags))
+    dataframe["destinationTCPFlagsDescription"] = dataframe["destinationTCPFlagsDescription"].apply(lambda flags: flags_transform(flags))
+    dataframe["protocolName"] = dataframe["protocolName"].astype("category")
+    dataframe["protocolName"] = dataframe["protocolName"].cat.codes
+    dataframe["appName"] = dataframe["appName"].astype("category")
+    dataframe["appName"] = dataframe["appName"].cat.codes
+    dataframe["direction"] = dataframe["direction"].astype("category")
+    dataframe["direction"] = dataframe["direction"].cat.codes
+    return dataframe
+def flags_transform(flags):
+    value = 0
+    if type(flags) is str:
+        flags = flags.replace(" ", "")
+        for c in flags:
+            if c != ',':
+                value += ord(c)
+
+    return value
+
+
+
+def captureTrafficScapy(ipregistered,model):
     def hasTCP(packet: Packet):
         if packet.haslayer("TCP"):
             return packet.getlayer("TCP").fields
@@ -144,7 +200,7 @@ def captureTrafficScapy(ipregistered):
         #print(packet.layers)
         #print(len(packet.layers()))
 
-        if IPLayer and IPLayer["src"] != '127.0.0.1' and  IPLayer["src"] != '::1' : 
+        if IPLayer:
             
             metadatainpacketfordictionarie["source"]=IPLayer["src"]
             metadatainpacketfordictionarie["destination"]=IPLayer["dst"]
@@ -202,10 +258,12 @@ def captureTrafficScapy(ipregistered):
         
         metadata=pd.DataFrame(metadataSortedFormat(metadatainpacketfordictionarie),index=[0])
         
+        #print(metadata)
+        #model.predict(decodeDataInInt(metadata))
     show_interfaces()
 
 
-    sniff( prn=packet_callback,iface="Software Loopback Interface 1")
+    sniff( prn=packet_callback,iface="Corechip SR9900 USB2.0 to Fast Ethernet Adapter")
 
 def sortdnumericditionaryinalist(defaultdictionarie: defaultdict):
     mostfrequentips=[]
@@ -236,24 +294,27 @@ def timeToSendFrequentsIPtoDatabase(ipregistered,secondstosend: int=1):
             current_time=time.time()
             time.sleep(1)
 
-    print("captureTraffic started")
-    total=0
-    for packet in capture.sniff_continuously(): 
-        ip_detected=False
-        for layer in packet.layers: 
-            #print("\n\n\n\n\n\n" + "current layer: " + layer.layer_name )
-            currlayer=getattr(packet,layer.layer_name)
-            for field in currlayer.field_names:
-                #print(f"{field} : {getattr(currlayer,field)}")
-                try:
-                    if currlayer.src in ipregistered and not ip_detected:
-                        ipregistered[currlayer.src]+=1
-                        ip_detected=True
-                    elif not ip_detected:
-                        ip_detected=True
-                        ipregistered[currlayer.src]=1
-                except:
-                    pass
+def secureHorizon() -> None:
+    import multiprocessing as mp
+    ipregistered=mp.Manager().dict()
+    #mp.Process(target=captureTraffic,args=[]).start()
+    #mp.Process(target=timeToSendFrequentsIPtoDatabase,args=[]).start()
+    try:
+        with open('dtree_best_model.pkl', 'rb') as f:
+            clf2 = pickle.load(f)
+    except:
+        clf2=None
+    pool = mp.Pool(mp.cpu_count())
+    process1=pool.apply_async(timeToSendFrequentsIPtoDatabase,args=[ipregistered])
+    process2=pool.apply_async(captureTrafficScapy,args=[ipregistered,clf2])
+
+    process2.get()
+    process1.get()
+    pool.close()
+    
+if __name__=='__main__':
+    secureHorizon()
+
 def send_To_Frontend(data_path):
     url = 'http://localhost:3000/api/traffic'
     try:
@@ -268,20 +329,3 @@ def send_To_Frontend(data_path):
                 print("Error")
     except Exception as e:
         print(e)
-
-def secureHorizon() -> None:
-    import multiprocessing as mp
-    ipregistered=mp.Manager().dict()
-    #mp.Process(target=captureTraffic,args=[]).start()
-    #mp.Process(target=timeToSendFrequentsIPtoDatabase,args=[]).start()
-
-    pool = mp.Pool(mp.cpu_count())
-    process1=pool.apply_async(timeToSendFrequentsIPtoDatabase,args=[ipregistered])
-    process2=pool.apply_async(captureTrafficScapy,args=[ipregistered])
-    
-    process2.get()
-    process1.get()
-    pool.close()
-    
-if __name__=='__main__':
-    secureHorizon()
